@@ -1,11 +1,9 @@
 #include "cudump.h"
 
 
-
 static void cubin_func_skip(char **pos, section_entry_t *e)
 {
 	*pos += sizeof(section_entry_t);
-/*#define GDEV_DEBUG*/
 #ifdef DEBUG
 	printf("/* nv.info: ignore entry type: 0x%04x, size=0x%x */\n",
 		   e->type, e->size);
@@ -35,7 +33,7 @@ static void cubin_func_unknown(char **pos, section_entry_t *e)
 }
 
 static int cubin_func_0a04
-(char **pos, section_entry_t *e, struct gdev_cuda_raw_func *raw_func)
+(char **pos, section_entry_t *e, struct cuda_raw_func *raw_func)
 {
 	const_entry_t *ce;
 
@@ -49,7 +47,7 @@ static int cubin_func_0a04
 }
 
 static int cubin_func_0c04
-(char **pos, section_entry_t *e, struct gdev_cuda_raw_func *raw_func)
+(char **pos, section_entry_t *e, struct cuda_raw_func *raw_func)
 {
 	*pos += sizeof(section_entry_t);
 	/* e->size is a parameter size, but how can we use it here? */
@@ -59,7 +57,7 @@ static int cubin_func_0c04
 }
 
 static int cubin_func_0d04
-(char **pos, section_entry_t *e, struct gdev_cuda_raw_func *raw_func)
+(char **pos, section_entry_t *e, struct cuda_raw_func *raw_func)
 {
 	stack_entry_t *se;
 
@@ -74,15 +72,15 @@ static int cubin_func_0d04
 }
 
 static int cubin_func_1704
-(char **pos, section_entry_t *e, struct gdev_cuda_raw_func *raw_func)
+(char **pos, section_entry_t *e, struct cuda_raw_func *raw_func)
 {
 	param_entry_t *pe;
-	struct gdev_cuda_param *param_data;
+	struct cuda_param *param_data;
 
 	*pos += sizeof(section_entry_t);
 	pe = (param_entry_t *)*pos;
 
-	param_data = (struct gdev_cuda_param *)malloc(sizeof(*param_data));
+	param_data = (struct cuda_param *)malloc(sizeof(*param_data));
 	param_data->idx = pe->idx;
 	param_data->offset = pe->offset;
 	param_data->size = pe->size >> 18;
@@ -98,7 +96,7 @@ static int cubin_func_1704
 }
 
 static int cubin_func_1903
-(char **pos, section_entry_t *e, struct gdev_cuda_raw_func *raw_func)
+(char **pos, section_entry_t *e, struct cuda_raw_func *raw_func)
 {
 	int ret;
 	char *pos2;
@@ -132,7 +130,7 @@ static int cubin_func_1903
 }
 
 static int cubin_func_1e04
-(char **pos, section_entry_t *e, struct gdev_cuda_raw_func *raw_func)
+(char **pos, section_entry_t *e, struct cuda_raw_func *raw_func)
 {
 	crs_stack_size_entry_t *crse;
 
@@ -146,7 +144,7 @@ static int cubin_func_1e04
 }
 
 static int cubin_func_type
-(char **pos, section_entry_t *e, struct gdev_cuda_raw_func *raw_func)
+(char **pos, section_entry_t *e, struct cuda_raw_func *raw_func)
 {
 	switch (e->type) {
 	case 0x0204: /* textures */
@@ -200,7 +198,7 @@ static int cubin_func_type
 
 static void destroy_all_symbols(struct CUmod_st *mod)
 {
-	struct gdev_cuda_const_symbol *cs, *cs2;
+	struct cuda_const_symbol *cs, *cs2;
 	list_for_each_entry_safe(cs, cs2, &mod->symbol_list, list_entry) {
 		list_del(&cs->list_entry);
 		free(cs);
@@ -211,9 +209,9 @@ static void destroy_all_symbols(struct CUmod_st *mod)
 static void destroy_all_functions(struct CUmod_st *mod)
 {
 	struct CUfunc_st *func, *func2;
-	struct gdev_cuda_raw_func *raw_func;
-	struct gdev_cuda_param *param_data;
-	struct gdev_list *p;
+	struct cuda_raw_func *raw_func;
+	struct cuda_param *param_data;
+	struct list_head *p;
 	list_for_each_entry_safe(func, func2, &mod->func_list, list_entry) {
 		list_del(&func->list_entry);
 		raw_func = &func->raw_func;
@@ -256,7 +254,7 @@ static void init_mod(struct CUmod_st *mod, char *bin)
 	mod->arch = 0;
 }
 
-static void init_raw_func(struct gdev_cuda_raw_func *f)
+static void init_raw_func(struct cuda_raw_func *f)
 {
 	int i;
 
@@ -367,7 +365,7 @@ static int load_cubin(struct CUmod_st *mod, char *bin)
 			   appears first for each function XXX... */
 			if (!strncmp(sh_name, SH_TEXT, strlen(SH_TEXT))) {
 				struct CUfunc_st *func = NULL;
-				struct gdev_cuda_raw_func *raw_func = NULL;
+				struct cuda_raw_func *raw_func = NULL;
 
 				/* this function does nothing if func is already allocated. */
 				func = malloc_func_if_necessary(mod, sh_name + strlen(SH_TEXT));
@@ -435,7 +433,7 @@ static int load_cubin(struct CUmod_st *mod, char *bin)
 			   we also assume that ".nv.info.funcname" is an end mark. */
 			else if (!strncmp(sh_name, SH_INFO_FUNC, strlen(SH_INFO_FUNC))) {
 				struct CUfunc_st *func = NULL;
-				struct gdev_cuda_raw_func *raw_func = NULL;
+				struct cuda_raw_func *raw_func = NULL;
 				/* this function does nothing if func is already allocated. */
 				func = malloc_func_if_necessary(mod, sh_name + strlen(SH_INFO_FUNC));
 				if (!func)
@@ -501,7 +499,7 @@ static int load_cubin(struct CUmod_st *mod, char *bin)
 			 }
 			 else { /* __constant__ */
 				 int x;
-				 struct gdev_cuda_const_symbol *cs = malloc(sizeof(*cs));
+				 struct cuda_const_symbol *cs = malloc(sizeof(*cs));
 				 if (!cs) {
 					 ret = -ENOMEM;
 					 goto fail_symbol;
@@ -552,10 +550,10 @@ static int load_cubin(struct CUmod_st *mod, char *bin)
 				/* goto fail_function; */
 			}
 		}
-		mod->arch = GDEV_ARCH_SM_2X;
+		mod->arch = CUDA_ARCH_SM_2X;
 	}
 	else { /* < sm_13 */
-		mod->arch = GDEV_ARCH_SM_1X;
+		mod->arch = CUDA_ARCH_SM_1X;
 	}
 
 	return 0;
@@ -605,7 +603,7 @@ static int load_file(char **pbin, const char *fname)
 	return 0;
 }
 
-int gdev_cuda_load_cubin_file(struct CUmod_st *mod, const char *fname)
+int cuda_load_cubin_file(struct CUmod_st *mod, const char *fname)
 {
 	char *bin;
 	int ret;
@@ -633,9 +631,9 @@ int main(int argc, char *argv[])
 {
 	struct CUmod_st mod;
 	struct CUfunc_st *func;
-	struct gdev_cuda_raw_func *f;
-	struct gdev_cuda_param *param_data;
-	struct gdev_cuda_const_symbol *cs;
+	struct cuda_raw_func *f;
+	struct cuda_param *param_data;
+	struct cuda_const_symbol *cs;
 	const char *fname;
 	int i, j;
 
@@ -645,7 +643,7 @@ int main(int argc, char *argv[])
 	}
 
 	fname = argv[1];
-	if (gdev_cuda_load_cubin_file(&mod, fname))
+	if (cuda_load_cubin_file(&mod, fname))
 		return 0;
 
 	/* code dump. */
@@ -723,7 +721,7 @@ int main(int argc, char *argv[])
 	printf("};\n");
 	printf("\n");
 
-	/* struct gdev_cudump dump. */
+	/* struct cudump dump. */
 	list_for_each_entry(func, &mod.func_list, list_entry) {
 		f = &func->raw_func;
 		printf("struct cudump %s = {\n", f->name);

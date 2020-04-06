@@ -7,9 +7,9 @@
 #include <limits.h>
 #include "list.h"
 
-#define GDEV_ARCH_SM_1X 0x50 /* sm_1x */
-#define GDEV_ARCH_SM_2X 0xc0 /* sm_2x */
-#define GDEV_ARCH_SM_3X 0xe0 /* sm_3x */
+#define CUDA_ARCH_SM_1X 0x50 /* sm_1x */
+#define CUDA_ARCH_SM_2X 0xc0 /* sm_2x */
+#define CUDA_ARCH_SM_3X 0xe0 /* sm_3x */
 
 #define Elf_Ehdr Elf64_Ehdr
 #define Elf_Shdr Elf64_Shdr
@@ -70,15 +70,15 @@ typedef struct symbol_entry {
 
 #define NVIDIA_CONST_SEGMENT_MAX_COUNT 32
 
-struct gdev_cuda_param {
+struct cuda_param {
 	int idx;
 	uint32_t offset;
 	uint32_t size;
 	uint32_t flags;
-	struct gdev_cuda_param *next;
+	struct cuda_param *next;
 };
 
-struct gdev_cuda_raw_func {
+struct cuda_raw_func {
 	char *name;
 	void *code_buf;
 	uint32_t code_size;
@@ -94,12 +94,12 @@ struct gdev_cuda_raw_func {
 	uint32_t param_base;
 	uint32_t param_size;
 	uint32_t param_count;
-	struct gdev_cuda_param *param_data;
+	struct cuda_param *param_data;
 	uint32_t local_size;
 	uint32_t local_size_neg;
 };
 
-struct gdev_cuda_const_symbol {
+struct cuda_const_symbol {
 	int idx; /* cX[] index. */
 	char *name;
 	uint32_t offset; /* offset in cX[]. */
@@ -128,7 +128,7 @@ struct CUmod_st {
 };
 
 struct CUfunc_st {
-	struct gdev_cuda_raw_func raw_func;
+	struct cuda_raw_func raw_func;
 	struct list_head list_entry;
 	struct CUmod_st *mod;
 };
