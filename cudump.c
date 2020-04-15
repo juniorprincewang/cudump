@@ -89,7 +89,7 @@ static int cubin_func_1704
 	/* append to the head of the parameter data list. */
 	param_data->next = raw_func->param_data;
 	raw_func->param_data = param_data;
-
+	raw_func->param_count++;
 	*pos += e->size;
 
 	return 0;
@@ -100,33 +100,17 @@ static int cubin_func_1903
 {
 	int ret;
 	char *pos2;
-
+	// 3 19 1c 0 
 	*pos += sizeof(section_entry_t);
-	pos2 = *pos;
-
-	/* obtain parameters information. is this really safe? */
-	do {
-		section_entry_t *sh_e = (section_entry_t *)pos2;
-		ret = cubin_func_1704(&pos2, sh_e, raw_func);
-		if (ret)
-			return ret;
-		raw_func->param_count++;
-	} while (((section_entry_t *)pos2)->type == 0x1704);
-
-	/* just check if the parameter size matches. */
-	if (raw_func->param_size != e->size) {
-		if (e->type == 0x1803) { /* sm_13 needs to set param_size here. */
-			raw_func->param_size = e->size;
-		}
-		else {
-			printf("Parameter size mismatched\n");
-			printf("0x%x and 0x%x\n", raw_func->param_size, e->size);
-		}
-	}
-
-	*pos = pos2; /* need to check if this is correct! */
-
+	raw_func->param_size = e->size;
 	return 0;
+}
+
+static void cubin_func_1b03(char **pos, section_entry_t *e)
+{
+	// 3 1b ffffffff 0 
+	// or 3 1b 3f 0
+	*pos += sizeof(section_entry_t);
 }
 
 static int cubin_func_1e04
@@ -163,29 +147,24 @@ static int cubin_func_type
 	case 0x1204: /* some counters but what is this? */
 		cubin_func_skip(pos, e);
 		break;
-	case 0x1803: /* kernel parameters itself (sm_13) */
-	case 0x1903: /* kernel parameters itself (sm_20/sm_30) */
+	case 0x1803: /* kernel parameters size (sm_13) */
+	case 0x1903: /* kernel parameters size (sm_20/sm_30) */
+	case 0x2101: /* kernel parameters size (> sm_70)*/
 		return cubin_func_1903(pos, e, raw_func);
 	case 0x1704: /* each parameter information */
 		return cubin_func_1704(pos, e, raw_func);
 	case 0x1e04: /* crs stack size information */
 		return cubin_func_1e04(pos, e, raw_func);
-	case 0x0001: /* ??? */
-		cubin_func_skip(pos, e);
-		break;
 	case 0x1b03: /*sm 35 unknow*/
+		cubin_func_1b03(pos, e);
+		break;
+	case 0x1c04: /*fix me*/
 		cubin_func_skip(pos, e);
 		break;
-	case 0x080d: /* ??? */
+	case 0x1d04:  /*fix me*/
 		cubin_func_skip(pos, e);
 		break;
-	case 0xf000: /* maybe just padding??? */
-		*pos += 4;
-		break;
-	case 0xffff: /* ??? */
-		cubin_func_skip(pos, e);
-		break;
-	case 0x0020: /* ??? */
+	case 0x2804: /*fix me*/
 		cubin_func_skip(pos, e);
 		break;
 	default: /* real unknown */
@@ -498,21 +477,21 @@ static int load_cubin(struct CUmod_st *mod, char *bin)
 			 if (sym->st_shndx == nvglobal_idx) { /* __device__ */
 			 }
 			 else { /* __constant__ */
-				 int x;
-				 struct cuda_const_symbol *cs = malloc(sizeof(*cs));
-				 if (!cs) {
-					 ret = -ENOMEM;
-					 goto fail_symbol;
-				 }
-				 sscanf(sh_name, SH_CONST"%d", &x);
-				 cs->idx = x;
-				 cs->name = sym_name;
-				 cs->offset = sym->st_value;
-				 cs->size = sym->st_size;
-				 INIT_LIST_HEAD(&cs->list_entry);
-				 list_add_tail(&cs->list_entry, &mod->symbol_list);
-				 mod->symbol_count++;
 			 }
+			 int x;
+			 struct cuda_const_symbol *cs = malloc(sizeof(*cs));
+			 if (!cs) {
+				 ret = -ENOMEM;
+				 goto fail_symbol;
+			 }
+			 sscanf(sh_name, SH_CONST"%d", &x);
+			 cs->idx = x;
+			 cs->name = sym_name;
+			 cs->offset = sym->st_value;
+			 cs->size = sym->st_size;
+			 INIT_LIST_HEAD(&cs->list_entry);
+			 list_add_tail(&cs->list_entry, &mod->symbol_list);
+			 mod->symbol_count++;
 			 break;
 		 case 0x12: /* function symbols */
 			 break;
